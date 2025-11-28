@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>鹿兒島旅程助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #F2F4F6; /* 霧島灰白 */
+            color: #2b2b2b;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .serif { font-family: 'Noto Serif JP', serif; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* 標籤配色：鹿兒島特製版 */
+        .tag-eat { background-color: #C0392B; color: white; } /* 黑豬肉紅 */
+        .tag-buy { background-color: #8E44AD; color: white; } /* 紫薯紫 */
+        .tag-nav { background-color: #2980B9; color: white; } /* 櫻島海藍 */
+        .tag-tips { background-color: #F39C12; color: white; } /* 柑橘橘 */
+        
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col">
+
+<div id="app" class="h-full flex flex-col max-w-md mx-auto bg-white shadow-2xl relative">
+    
+    <header class="px-6 py-5 bg-white/90 backdrop-blur border-b border-gray-100 flex justify-between items-center z-10 sticky top-0">
+        <div>
+            <h1 class="text-xl font-bold serif tracking-widest text-gray-800">KAGOSHIMA</h1>
+            <p class="text-xs text-gray-500 tracking-wide mt-1">2025 冬季自駕之旅</p>
+        </div>
+        <div class="text-right">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+                <i class="fas fa-volcano text-red-400"></i>
+                <span>9°C</span>
+            </div>
+            <p class="text-[10px] text-gray-400">鹿兒島市</p>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto hide-scrollbar bg-[#F7F5F0] pb-24 relative">
+        
+        <div v-if="currentTab === 'itinerary'" class="px-4 py-4 space-y-6">
+            
+            <div class="flex overflow-x-auto gap-3 pb-2 hide-scrollbar sticky top-0 z-20 py-3 -mx-4 px-4 bg-[#F7F5F0]/95 backdrop-blur-sm">
+                <button v-for="(day, index) in itinerary" :key="index"
+                    @click="activeDayIndex = index"
+                    :class="['flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all shadow-sm border', 
+                    activeDayIndex === index ? 'bg-[#2C3E50] text-white border-[#2C3E50]' : 'bg-white text-gray-500 border-gray-200']">
+                    {{ day.shortDate }}
+                </button>
+            </div>
+
+            <div class="space-y-4 animate-fade-in">
+                <div class="text-center py-2">
+                    <h2 class="text-lg font-bold serif text-gray-800">{{ itinerary[activeDayIndex].title }}</h2>
+                    <p class="text-xs text-gray-500 mt-1"><i :class="itinerary[activeDayIndex].icon"></i> {{ itinerary[activeDayIndex].theme }}</p>
+                </div>
+
+                <div v-for="(item, idx) in itinerary[activeDayIndex].events" :key="idx" 
+                     class="bg-white rounded-xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border-l-[3px] relative overflow-hidden group transition-transform active:scale-[0.99]"
+                     :class="{
+                        'border-blue-400': item.type === 'transport',
+                        'border-red-400': item.type === 'food',
+                        'border-green-600': item.type === 'spot',
+                        'border-gray-300': item.type === 'hotel'
+                     }">
+                    
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600 font-mono">{{ item.time }}</span>
+                            <span v-if="item.subType" class="text-[10px] text-gray-400 border border-gray-200 px-1 rounded">{{ item.subType }}</span>
+                        </div>
+                        <a :href="'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(item.queryLocation || item.location)" target="_blank"
+                           class="text-gray-300 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-full transition-colors">
+                            <i class="fas fa-location-arrow text-lg"></i>
+                        </a>
+                    </div>
+                    
+                    <h3 class="text-base font-bold text-gray-800 mb-1 leading-snug">{{ item.title }}</h3>
+                    <p class="text-sm text-gray-600 mb-3 leading-relaxed text-justify">{{ item.desc }}</p>
+
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        <span v-for="tag in item.tags" :key="tag.text" 
+                              :class="['text-[10px] px-2 py-1 rounded font-medium tracking-wide shadow-sm', tagClass(tag.type)]">
+                            {{ tag.text }}
+                        </span>
+                    </div>
+
+                    <div v-if="item.story" class="mt-3 pt-3 border-t border-dashed border-gray-100 text-xs text-gray-500 italic bg-gray-50/50 -mx-4 px-4 pb-1">
+                        <i class="fas fa-book-open mr-1 text-gray-400"></i> {{ item.story }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="currentTab === 'info'" class="px-4 py-6 space-y-6">
+            <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+                <h3 class="font-bold text-gray-800 mb-4 border-b pb-2 flex items-center gap-2">
+                    <i class="fas fa-plane-departure text-blue-500"></i> 華航航班
+                </h3>
+                <div class="space-y-4 text-sm">
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between font-bold text-gray-800">
+                            <span>TPE 台北</span> <i class="fas fa-arrow-right text-xs mt-1 text-gray-400"></i> <span>KOJ 鹿兒島</span>
+                        </div>
+                        <div class="flex justify-between text-gray-500 text-xs">
+                            <span>CI 118</span> <span>12/13 (六) 08:25 - 11:20</span>
+                        </div>
+                    </div>
+                    <div class="w-full h-px bg-gray-100"></div>
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between font-bold text-gray-800">
+                            <span>KOJ 鹿兒島</span> <i class="fas fa-arrow-right text-xs mt-1 text-gray-400"></i> <span>TPE 台北</span>
+                        </div>
+                        <div class="flex justify-between text-gray-500 text-xs">
+                            <span>CI 119</span> <span>12/16 (二) 12:25 - 13:55</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+                 <h3 class="font-bold text-gray-800 mb-4 border-b pb-2 flex items-center gap-2">
+                    <i class="fas fa-bed text-indigo-500"></i> 住宿資訊
+                </h3>
+                <div class="space-y-4">
+                    <div class="bg-gray-50 p-3 rounded-lg">
+                        <p class="font-bold text-sm text-gray-800">中原別莊 (Nakahara Bessou)</p>
+                        <p class="text-xs text-gray-500 mt-1"><i class="fas fa-map-marker-alt mr-1"></i>鹿兒島市區 (Day 1-2)</p>
+                        <a href="https://goo.gl/maps/PlaceHolder" class="text-xs text-blue-500 mt-1 block">查看地圖</a>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-lg">
+                        <p class="font-bold text-sm text-gray-800">妙見石原莊 (Myoken Ishiharaso)</p>
+                        <p class="text-xs text-gray-500 mt-1"><i class="fas fa-spa mr-1"></i>妙見溫泉 (Day 3)</p>
+                        <p class="text-[10px] text-green-600 mt-1 font-medium">★ 頂級溫泉旅館</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+                <h3 class="font-bold text-gray-800 mb-3 border-b pb-2 flex items-center gap-2">
+                   <i class="fas fa-car text-green-500"></i> 租車資訊
+               </h3>
+               <div class="text-sm space-y-2">
+                   <p><span class="font-bold">Toyota Rent a Car</span></p>
+                   <p class="text-gray-500 text-xs">取車：Day 3 鹿兒島市區</p>
+                   <p class="text-gray-500 text-xs">還車：Day 4 鹿兒島機場店</p>
+                   <div class="bg-yellow-50 text-yellow-800 p-2 rounded text-xs mt-2">
+                       <i class="fas fa-exclamation-triangle"></i> 還車前記得加滿油 (Regular)
+                   </div>
+               </div>
+           </div>
+        </div>
+
+        <div v-if="currentTab === 'budget'" class="px-4 py-6">
+            <div class="bg-gradient-to-r from-gray-800 to-gray-700 rounded-xl shadow-lg p-6 mb-6 text-white relative overflow-hidden">
+                <div class="relative z-10">
+                    <p class="text-xs opacity-70 mb-1">目前總支出 (JPY)</p>
+                    <h2 class="text-3xl font-bold font-mono tracking-tight">¥{{ totalExpense.toLocaleString() }}</h2>
+                </div>
+                <i class="fas fa-yen-sign absolute -right-4 -bottom-4 text-8xl opacity-10 rotate-12"></i>
+            </div>
+
+            <form @submit.prevent="addExpense" class="bg-white p-4 rounded-xl shadow-sm mb-6 space-y-3">
+                <input v-model="newExpense.item" placeholder="消費項目 (例如: 黑豬肉火鍋)" class="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 text-sm focus:outline-none focus:border-gray-400 transition-colors" required>
+                <div class="flex gap-2">
+                    <input v-model.number="newExpense.amount" type="number" placeholder="金額" class="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 text-sm focus:outline-none focus:border-gray-400" required>
+                    <button type="submit" class="bg-gray-800 text-white px-5 rounded-lg hover:bg-gray-700 transition-colors"><i class="fas fa-plus"></i></button>
+                </div>
+            </form>
+
+            <div class="space-y-3">
+                <div v-for="(exp, index) in expenseList" :key="index" class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <span class="text-gray-700 text-sm font-medium">{{ exp.item }}</span>
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono font-bold text-gray-900">¥{{ exp.amount }}</span>
+                        <button @click="removeExpense(index)" class="text-gray-300 hover:text-red-500 transition-colors text-xs p-1"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                <div v-if="expenseList.length === 0" class="text-center py-8">
+                    <i class="fas fa-receipt text-4xl text-gray-200 mb-2"></i>
+                    <p class="text-gray-400 text-xs">尚無記帳紀錄</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <nav class="bg-white/95 backdrop-blur border-t border-gray-200 flex justify-around items-center h-20 pb-safe fixed bottom-0 w-full max-w-md z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <button @click="currentTab = 'itinerary'" :class="['flex flex-col items-center gap-1 w-full h-full justify-center transition-colors', currentTab === 'itinerary' ? 'text-gray-800' : 'text-gray-400 hover:text-gray-600']">
+            <i class="fas fa-map-marked-alt text-xl mb-0.5"></i>
+            <span class="text-[10px] font-medium tracking-wide">行程</span>
+        </button>
+        <button @click="currentTab = 'info'" :class="['flex flex-col items-center gap-1 w-full h-full justify-center transition-colors', currentTab === 'info' ? 'text-gray-800' : 'text-gray-400 hover:text-gray-600']">
+            <i class="fas fa-suitcase text-xl mb-0.5"></i>
+            <span class="text-[10px] font-medium tracking-wide">資訊</span>
+        </button>
+        <button @click="currentTab = 'budget'" :class="['flex flex-col items-center gap-1 w-full h-full justify-center transition-colors', currentTab === 'budget' ? 'text-gray-800' : 'text-gray-400 hover:text-gray-600']">
+            <i class="fas fa-calculator text-xl mb-0.5"></i>
+            <span class="text-[10px] font-medium tracking-wide">記帳</span>
+        </button>
+    </nav>
+</div>
+
+<script>
+    const { createApp, ref, computed, onMounted, watch } = Vue;
+
+    createApp({
+        setup() {
+            const currentTab = ref('itinerary');
+            const activeDayIndex = ref(0);
+            
+            // --- 記帳系統 ---
+            const newExpense = ref({ item: '', amount: '' });
+            const expenseList = ref([]);
+
+            onMounted(() => {
+                const saved = localStorage.getItem('kagoshima_trip_expenses');
+                if (saved) expenseList.value = JSON.parse(saved);
+            });
+
+            watch(expenseList, (newVal) => {
+                localStorage.setItem('kagoshima_trip_expenses', JSON.stringify(newVal));
+            }, { deep: true });
+
+            const addExpense = () => {
+                if(!newExpense.value.item || !newExpense.value.amount) return;
+                expenseList.value.unshift({ ...newExpense.value });
+                newExpense.value = { item: '', amount: '' };
+            };
+
+            const removeExpense = (index) => {
+                expenseList.value.splice(index, 1);
+            };
+
+            const totalExpense = computed(() => {
+                return expenseList.value.reduce((sum, item) => sum + item.amount, 0);
+            });
+
+            const tagClass = (type) => {
+                switch(type) {
+                    case 'eat': return 'tag-eat';
+                    case 'buy': return 'tag-buy';
+                    case 'nav': return 'tag-nav';
+                    default: return 'tag-tips';
+                }
+            };
+
+            // --- 鹿兒島行程資料 ---
+            const itinerary = ref([
+                {
+                    shortDate: "Day 1 (12/13)",
+                    date: "2025/12/13",
+                    title: "抵達鹿兒島・市區漫遊",
+                    theme: "歷史與美食",
+                    icon: "fas fa-city",
+                    events: [
+                        { time: "11:30", type: "transport", title: "抵達鹿兒島空港", location: "Kagoshima Airport", desc: "國內線出口搭乘機場巴士前往市區 (約70分 / ¥1400)。", tags: [{text:"國內線乘車", type:"tips"}] },
+                        { time: "13:00", type: "food", title: "午餐：黑豬涮涮鍋", location: "Ichiniisan Tenmonkan", queryLocation: "いちにいさん 天文館店", desc: "鹿兒島必吃黑豬肉料理，就在天文館通附近。", tags: [{text:"必吃黑豬肉", type:"eat"}] },
+                        { time: "14:10", type: "spot", title: "維新故鄉館", location: "Museum of the Meiji Restoration", desc: "徒步前往，了解明治維新與西鄉隆盛的歷史。", story: "這裡重現了幕末時代的場景，西鄉隆盛是這裡的靈魂人物。", tags: [{text:"歷史控必去", type:"tips"}] },
+                        { time: "16:00", type: "buy", title: "天文館通 & 白熊冰", location: "Tenmonkan Mujaki", queryLocation: "天文館むじゃき 本店", desc: "逛山形屋、Loft，下午茶必點「白熊冰」。", tags: [{text:"白熊冰創始店", type:"eat"}, {text:"逛街", type:"buy"}] },
+                        { time: "19:00", type: "food", title: "晚餐：天文館 吾愛人", location: "Tenmonkan Wakana", queryLocation: "天文館 吾愛人 本店", desc: "體驗正宗鹿兒島鄉土料理與燒酌。", tags: [{text:"鄉土料理", type:"eat"}] },
+                        { time: "21:00", type: "hotel", title: "中原別莊 (Nakahara Bessou)", location: "Nakahara Bessou", desc: "享受溫泉，休息。", tags: [{text:"溫泉", type:"tips"}] }
+                    ]
+                },
+                {
+                    shortDate: "Day 2 (12/14)",
+                    date: "2025/12/14",
+                    title: "櫻島火山・壯麗絕景",
+                    theme: "自然與渡輪",
+                    icon: "fas fa-mountain",
+                    events: [
+                        { time: "09:00", type: "spot", title: "城山展望台", location: "Shiroyama Observatory", desc: "搭City View巴士前往，眺望市區與櫻島。", story: "這裡是西南戰爭最後的戰場，視野極佳。", tags: [{text:"使用CUTE券", type:"tips"}] },
+                        { time: "10:15", type: "transport", title: "搭乘櫻島渡輪", location: "Kagoshima Port Ferry Terminal", desc: "前往櫻島，船程約15分鐘。", tags: [{text:"CUTE券可用", type:"tips"}] },
+                        { time: "10:40", type: "spot", title: "櫻島周遊 (Island View)", location: "Yunohira Observatory", desc: "搭觀光巴士參觀湯之平展望所，近距離感受火山。", story: "櫻島是世界上少數著名的活火山，至今每天都還有小噴發。", tags: [] },
+                        { time: "12:00", type: "food", title: "午餐：櫻島休息站", location: "Michi no Eki Sakurajima", desc: "享用櫻島小蜜橘霜淇淋或當地定食。", tags: [{text:"小蜜橘", type:"eat"}] },
+                        { time: "14:00", type: "transport", title: "返回市區", location: "Kagoshima Port", desc: "搭渡輪回鹿兒島港，市區自由活動。", tags: [] },
+                        { time: "18:30", type: "food", title: "晚餐時間", location: "Kagoshima Chuo Station", desc: "建議在中央車站或天文館周邊享用。", tags: [] }
+                    ]
+                },
+                {
+                    shortDate: "Day 3 (12/15)",
+                    date: "2025/12/15",
+                    title: "霧島自駕・溫泉文化",
+                    theme: "自駕與秘湯",
+                    icon: "fas fa-car-side",
+                    events: [
+                        { time: "09:30", type: "transport", title: "租車出發", location: "Toyota Rent a Car Kagoshima", desc: "辦理手續，開車前往上野原。", tags: [{text:"自駕開始", type:"nav"}] },
+                        { time: "10:00", type: "spot", title: "上野原繩文遺跡", location: "Uenohara Jomon Forest", desc: "散步於森林與遺跡之間，參觀博物館。", tags: [{text:"世界遺產相關", type:"tips"}] },
+                        { time: "12:00", type: "food", title: "午餐：霧島神宮參道", location: "Kirishima Jingu", desc: "「山の幸」或「霧島茶寮」。", tags: [{text:"能量景點", type:"eat"}] },
+                        { time: "13:30", type: "spot", title: "嘉例川車站", location: "Kareigawa Station", desc: "百年木造車站，買杯咖啡休息拍照。", story: "於1903年開業，是鹿兒島縣內最古老的木造站房，還有貓咪住在這裡。", tags: [{text:"必拍", type:"spot"}] },
+                        { time: "15:00", type: "hotel", title: "Check-in 妙見石原莊", location: "Myoken Ishiharaso", desc: "入住頂級溫泉旅館，享受極致放鬆。", story: "這裡的露天溫泉緊鄰溪流，與大自然合而為一。", tags: [{text:"頂級享受", type:"tips"}] }
+                    ]
+                },
+                {
+                    shortDate: "Day 4 (12/16)",
+                    date: "2025/12/16",
+                    title: "告別鹿兒島・返程",
+                    theme: "歸途",
+                    icon: "fas fa-plane",
+                    events: [
+                        { time: "09:30", type: "transport", title: "退房出發", location: "Myoken Ishiharaso", desc: "享受最後的早晨時光，前往機場。", tags: [] },
+                        { time: "09:50", type: "transport", title: "Toyota 還車", location: "Toyota Rent a Car Kagoshima Airport", desc: "機場店還車，搭接駁車至航廈。", tags: [{text:"記得加油", type:"tips"}] },
+                        { time: "10:10", type: "transport", title: "機場報到", location: "Kagoshima Airport International Terminal", desc: "辦理登機手續，逛逛機場伴手禮店。", tags: [{text:"薩摩炸魚餅", type:"buy"}] },
+                        { time: "12:25", type: "transport", title: "起飛返台", location: "Kagoshima Airport", desc: "搭乘 CI 119 (12:25 - 13:55)。", tags: [{text:"回家囉", type:"tips"}] }
+                    ]
+                }
+            ]);
+
+            return {
+                currentTab,
+                activeDayIndex,
+                itinerary,
+                newExpense,
+                expenseList,
+                addExpense,
+                removeExpense,
+                totalExpense,
+                tagClass
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
